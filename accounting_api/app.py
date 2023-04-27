@@ -7,6 +7,8 @@ from domains.employee import Employee as _employee
 
 
 app = FastAPI()
+v1 = FastAPI(title="Employee API", version="0.1.0")
+v2 = FastAPI(title="Employee API", version="0.2.0")
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["Home"])
@@ -62,22 +64,22 @@ def get_employees(first_name: str, ddb=Depends(initialize_ddb)):
     return response['Items']
 
 
-# @app.get(
-#     "/employee/netsalary/{employee_id}",
-#     status_code=status.HTTP_200_OK,
-#     tags=["Employees"],
-# )
-# def get_netsalary(
-#     employee_id: int, ddb=Depends(initialize_ddb), tr=Depends(TaxRateRetrieverSSM)
-# ):
-#     response = ddb.Table('employees').get_item(Key={'employee_id': employee_id})
-#     employee = _employee(**response['Item'])
-#     tax_rate = tr.get_tax_rate(employee.country)
-#     net_salary = employee.calculate_net_salary(tax_rate)
-#     return net_salary
+@v1.get(
+    "/employee/netsalary/{employee_id}",
+    status_code=status.HTTP_200_OK,
+    tags=["Employees"],
+)
+def get_netsalary(
+    employee_id: int, ddb=Depends(initialize_ddb), tr=Depends(TaxRateRetrieverSSM)
+):
+    response = ddb.Table('employees').get_item(Key={'employee_id': employee_id})
+    employee = _employee(**response['Item'])
+    tax_rate = tr.get_tax_rate(employee.country)
+    net_salary = employee.calculate_net_salary(tax_rate)
+    return net_salary
 
 
-@app.get(
+@v2.get(
     "/employee/netsalary/{employee_id}",
     status_code=status.HTTP_200_OK,
     tags=["Employees"],
@@ -90,3 +92,7 @@ def get_netsalary(
     tax_rate = tr.get_tax_rate(employee.country)
     net_salary = employee.calculate_net_salary(tax_rate)
     return net_salary
+
+
+app.mount("/api/v1", v1)
+app.mount("/api/v2", v2)
