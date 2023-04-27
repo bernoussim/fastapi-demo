@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 import boto3
+from pydantic import BaseModel
+
 
 app = FastAPI()
 
@@ -12,6 +14,14 @@ def home():
 ddb_resource = boto3.resource('dynamodb')
 
 
+class Employee(BaseModel):
+    employee_id: int
+    first_name: str
+    last_name: str
+    country: str
+    salary: int
+
+
 @app.get("/employees/{employee_id}")
 def get_employee(employee_id: int):
     response = ddb_resource.Table('employees').get_item(
@@ -21,16 +31,6 @@ def get_employee(employee_id: int):
 
 
 @app.post("/employees")
-def create_employee(
-    employee_id: int, first_name: str, last_name: str, country: str, salary: int
-):
-    response = ddb_resource.Table('employees').put_item(
-        Item={
-            'employee_id': employee_id,
-            'first_name': first_name,
-            'last_name': last_name,
-            'country': country,
-            'salalry': salary,
-        }
-    )
+def create_employee(employee: Employee):
+    response = ddb_resource.Table('employees').put_item(Item=employee.dict())
     return response
