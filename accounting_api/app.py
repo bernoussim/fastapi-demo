@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 import boto3
 from pydantic import BaseModel, validator
+from boto3.dynamodb.conditions import Attr
 
 
 app = FastAPI()
@@ -40,3 +41,11 @@ def get_employee(employee_id: int):
 def create_employee(employee: Employee):
     response = ddb_resource.Table('employees').put_item(Item=employee.dict())
     return response
+
+
+@app.get("/employees")
+def get_employees(first_name: str):
+    response = ddb_resource.Table('employees').scan(
+        FilterExpression=Attr('first_name').eq(first_name)
+    )
+    return response['Items']
