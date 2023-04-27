@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 import boto3
 from pydantic import BaseModel, validator
 from boto3.dynamodb.conditions import Attr
@@ -7,7 +7,7 @@ from boto3.dynamodb.conditions import Attr
 app = FastAPI()
 
 
-@app.get("/")
+@app.get("/", status_code=status.HTTP_200_OK, tags=["Home"])
 def home():
     return {"message": "Hello World"}
 
@@ -29,7 +29,7 @@ class Employee(BaseModel):
         return v
 
 
-@app.get("/employees/{employee_id}")
+@app.get("/employees/{employee_id}", status_code=status.HTTP_200_OK, tags=["Employees"])
 def get_employee(employee_id: int):
     response = ddb_resource.Table('employees').get_item(
         Key={'employee_id': employee_id}
@@ -37,13 +37,18 @@ def get_employee(employee_id: int):
     return response['Item']
 
 
-@app.post("/employees")
-def create_employee(employee: Employee):
+@app.post(
+    "/employees",
+    status_code=status.HTTP_201_CREATED,
+    tags=["Employees"],
+    summary="Create a new employee",
+)
+async def create_employee(employee: Employee):
     response = ddb_resource.Table('employees').put_item(Item=employee.dict())
     return response
 
 
-@app.get("/employees")
+@app.get("/employees", status_code=status.HTTP_200_OK, tags=["Employees"])
 def get_employees(first_name: str):
     response = ddb_resource.Table('employees').scan(
         FilterExpression=Attr('first_name').eq(first_name)
