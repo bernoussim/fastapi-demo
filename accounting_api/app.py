@@ -1,7 +1,9 @@
-from fastapi import FastAPI, status
+from fastapi import FastAPI, status, Depends
 import boto3
 from pydantic import BaseModel, validator
 from boto3.dynamodb.conditions import Attr
+from providers.tax_retriever import TaxRateRetrieverSSM, TaxRateRetrieverDDB
+from domains.employee import Employee as _employee
 
 
 app = FastAPI()
@@ -10,9 +12,6 @@ app = FastAPI()
 @app.get("/", status_code=status.HTTP_200_OK, tags=["Home"])
 def home():
     return {"message": "Hello World"}
-
-
-ddb_resource = boto3.resource('dynamodb')
 
 
 class Employee(BaseModel):
@@ -29,11 +28,18 @@ class Employee(BaseModel):
         return v
 
 
-@app.get("/employees/{employee_id}", status_code=status.HTTP_200_OK, tags=["Employees"])
-def get_employee(employee_id: int):
-    response = ddb_resource.Table('employees').get_item(
-        Key={'employee_id': employee_id}
-    )
+def initialize_ddb():
+    ddb = boto3.resource('dynamodb')
+    return ddb
+
+
+@app.get(
+    "/employees/{employee_id}",
+    status_code=status.HTTP_200_OK,
+    tags=["Employees"],
+)
+def get_employee(employee_id: int, ddb=Depends(initialize_ddb)):
+    response = ddb.Table('employees').get_item(Key={'employee_id': employee_id})
     return response['Item']
 
 
@@ -43,14 +49,44 @@ def get_employee(employee_id: int):
     tags=["Employees"],
     summary="Create a new employee",
 )
-async def create_employee(employee: Employee):
-    response = ddb_resource.Table('employees').put_item(Item=employee.dict())
+async def create_employee(employee: Employee, ddb=Depends(initialize_ddb)):
+    response = ddb.Table('employees').put_item(Item=employee.dict())
     return response
 
 
 @app.get("/employees", status_code=status.HTTP_200_OK, tags=["Employees"])
-def get_employees(first_name: str):
-    response = ddb_resource.Table('employees').scan(
+def get_employees(first_name: str, ddb=Depends(initialize_ddb)):
+    response = ddb.Table('employees').scan(
         FilterExpression=Attr('first_name').eq(first_name)
     )
     return response['Items']
+
+
+# @app.get(
+#     "/employee/netsalary/{employee_id}",
+#     status_code=status.HTTP_200_OK,
+#     tags=["Employees"],
+# )
+# def get_netsalary(
+#     employee_id: int, ddb=Depends(initialize_ddb), tr=Depends(TaxRateRetrieverSSM)
+# ):
+#     response = ddb.Table('employees').get_item(Key={'employee_id': employee_id})
+#     employee = _employee(**response['Item'])
+#     tax_rate = tr.get_tax_rate(employee.country)
+#     net_salary = employee.calculate_net_salary(tax_rate)
+#     return net_salary
+
+
+@app.get(
+    "/employee/netsalary/{employee_id}",
+    status_code=status.HTTP_200_OK,
+    tags=["Employees"],
+)
+def get_netsalary(
+    employee_id: int, ddb=Depends(initialize_ddb), tr=Depends(TaxRateRetrieverDDB)
+):
+    response = ddb.Table('employees').get_item(Key={'employee_id': employee_id})
+    employee = _employee(**response['Item'])
+    tax_rate = tr.get_tax_rate(employee.country)
+    net_salary = employee.calculate_net_salary(tax_rate)
+    return net_salary
