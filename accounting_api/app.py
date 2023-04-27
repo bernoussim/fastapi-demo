@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import boto3
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 
 app = FastAPI()
@@ -20,6 +20,12 @@ class Employee(BaseModel):
     last_name: str
     country: str
     salary: int
+
+    @validator('employee_id')
+    def validate_employee_id(cls, v):
+        if v > 9999 or v < 1000:
+            raise ValueError('Employee ID must have 4 digits')
+        return v
 
 
 @app.get("/employees/{employee_id}")
